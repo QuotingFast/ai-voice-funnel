@@ -15,9 +15,8 @@ app.get('/intro.mp3', (req, res) => {
 // Generate MP3 using ElevenLabs
 const generateElevenLabsAudio = async () => {
   try {
-    const voiceId = 'lxYfHSkYm1EzQzGhdbfc'; // Jessica
+    const voiceId = process.env.ELEVENLABS_VOICE_ID; // example: lxYfHSkYm1EzQzGhdbfc
     const apiKey = process.env.ELEVENLABS_API_KEY;
-
 
     const response = await axios.post(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
@@ -65,6 +64,7 @@ app.post('/voice', (req, res) => {
   res.send(twiml);
 });
 
+// Start server and generate audio
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   await generateElevenLabsAudio();
