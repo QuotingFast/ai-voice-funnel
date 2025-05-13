@@ -1,23 +1,35 @@
 const express = require('express');
 const fs = require('fs');
 const axios = require('axios');
+const path = require('path');
 const app = express();
+
 const PORT = process.env.PORT || 10000;
+const voiceId = process.env.ELEVENLABS_VOICE_ID;
+const apiKey = process.env.ELEVENLABS_API_KEY;
 
 app.use(express.urlencoded({ extended: true }));
-app.use('/public', express.static('public'));
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
-// Serve the ElevenLabs MP3
+// Serve pre-generated MP3
 app.get('/intro.mp3', (req, res) => {
-  res.sendFile(__dirname + '/public/intro.mp3');
+  res.sendFile(path.join(__dirname, 'public', 'intro.mp3'));
 });
 
-// Generate MP3 using ElevenLabs
+// Respond to Twilio call
+app.post('/voice', (req, res) => {
+  const twiml = `
+    <Response>
+      <Play>https://${req.headers.host}/intro.mp3</Play>
+    </Response>
+  `;
+  res.type('text/xml');
+  res.send(twiml);
+});
+
+// Generate MP3 once at startup
 const generateElevenLabsAudio = async () => {
   try {
-    const voiceId = process.env.ELEVENLABS_VOICE_ID; // example: lxYfHSkYm1EzQzGhdbfc
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-
     const response = await axios.post(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
@@ -38,36 +50,27 @@ const generateElevenLabsAudio = async () => {
       }
     );
 
-    const writer = fs.createWriteStream('./public/intro.mp3');
+    const outputPath = path.join(__dirname, 'public', 'intro.mp3');
+    const writer = fs.createWriteStream(outputPath);
     response.data.pipe(writer);
 
     return new Promise((resolve, reject) => {
       writer.on('finish', () => {
-        console.log('✅ ElevenLabs MP3 saved');
+        console.log('✅ MP3 saved at startup');
         resolve();
       });
-      writer.on('error', reject);
+      writer.on('error', (err) => {
+        console.error('❌ Error saving MP3:', err.message);
+        reject(err);
+      });
     });
   } catch (err) {
-    console.error('❌ ElevenLabs error:', err.message);
+    console.error('❌ ElevenLabs API error:', err.message);
   }
 };
 
-// Twilio voice webhook – returns <Play> to ElevenLabs MP3
-app.post('/voice', (req, res) => {
-  const twiml = `
-    <Response>
-      <Play>https://${req.headers.host}/intro.mp3</Play>
-    </Response>
-  `;
-  res.type('text/xml');
-  res.send(twiml);
-});
-
-// Start server and generate audio
+// Start server and pre-generate MP3
 app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
   await generateElevenLabsAudio();
 });
-// trigger redeploy
-// trigger redeploy
